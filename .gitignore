@@ -130,3 +130,6 @@ dmypy.json
 *.bak
 temp/
 tmp/
+
+# SmartIR capture tool session (contains local MQTT credentials/config)
+tools/capture_session.json
