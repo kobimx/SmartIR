@@ -119,16 +119,24 @@ def _options_schema(platform: str, defaults: dict | None = None) -> vol.Schema:
             return vol.Optional(key, description={"suggested_value": val})
         return vol.Optional(key)
 
+    # Power sensors are only ever checked for on/off state (see
+    # SmartIRClimate._async_power_sensor_changed and the equivalent methods in
+    # fan.py, light.py, media_player.py, which compare .state to STATE_ON/STATE_OFF)
+    # so restrict the picker to domains that expose a binary on/off state.
+    power_sensor_selector = EntitySelector(
+        EntitySelectorConfig(domain=["binary_sensor", "switch", "input_boolean"])
+    )
+
     if platform == "climate":
         return vol.Schema(
             {
                 _opt(CONF_TEMPERATURE_SENSOR): EntitySelector(
-                    EntitySelectorConfig(domain="sensor")
+                    EntitySelectorConfig(domain="sensor", device_class="temperature")
                 ),
                 _opt(CONF_HUMIDITY_SENSOR): EntitySelector(
-                    EntitySelectorConfig(domain="sensor")
+                    EntitySelectorConfig(domain="sensor", device_class="humidity")
                 ),
-                _opt(CONF_POWER_SENSOR): EntitySelector(EntitySelectorConfig()),
+                _opt(CONF_POWER_SENSOR): power_sensor_selector,
                 vol.Optional(
                     CONF_POWER_SENSOR_RESTORE_STATE,
                     default=bool(d.get(CONF_POWER_SENSOR_RESTORE_STATE, False)),
@@ -144,7 +152,7 @@ def _options_schema(platform: str, defaults: dict | None = None) -> vol.Schema:
             else ""
         )
         fields: dict = {
-            _opt(CONF_POWER_SENSOR): EntitySelector(EntitySelectorConfig()),
+            _opt(CONF_POWER_SENSOR): power_sensor_selector,
             vol.Optional(
                 CONF_DEVICE_CLASS,
                 description={"suggested_value": d.get(CONF_DEVICE_CLASS, "tv")},
@@ -164,9 +172,7 @@ def _options_schema(platform: str, defaults: dict | None = None) -> vol.Schema:
         return vol.Schema(fields)
 
     # fan and light
-    return vol.Schema(
-        {_opt(CONF_POWER_SENSOR): EntitySelector(EntitySelectorConfig())}
-    )
+    return vol.Schema({_opt(CONF_POWER_SENSOR): power_sensor_selector})
 
 
 def _parse_options(platform: str, user_input: dict) -> dict:

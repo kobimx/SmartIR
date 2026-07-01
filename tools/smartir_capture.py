@@ -97,6 +97,37 @@ def combo_label(combo: dict) -> str:
     return " / ".join(parts)
 
 
+class _Tooltip:
+    """Simple hover tooltip for tkinter/ttk widgets."""
+
+    def __init__(self, widget, text: str, wraplength: int = 320):
+        self.widget = widget
+        self.text = text
+        self.wraplength = wraplength
+        self._tip: tk.Toplevel | None = None
+        widget.bind("<Enter>", self._show)
+        widget.bind("<Leave>", self._hide)
+
+    def _show(self, _event=None):
+        if self._tip is not None:
+            return
+        x = self.widget.winfo_rootx()
+        y = self.widget.winfo_rooty() + self.widget.winfo_height() + 4
+        self._tip = tw = tk.Toplevel(self.widget)
+        tw.wm_overrideredirect(True)
+        tw.wm_geometry(f"+{x}+{y}")
+        tk.Label(
+            tw, text=self.text, justify="left", background="#ffffe0",
+            relief="solid", borderwidth=1, wraplength=self.wraplength,
+            font=("TkDefaultFont", 9), padx=6, pady=4,
+        ).pack()
+
+    def _hide(self, _event=None):
+        if self._tip is not None:
+            self._tip.destroy()
+            self._tip = None
+
+
 # ---------------------------------------------------------------------------
 # Main App
 # ---------------------------------------------------------------------------
@@ -118,6 +149,7 @@ class SmartIRCapture(tk.Tk):
         self._listen_timer = None
         self.mqtt_client = None
         self._friendly_name: str = ""
+        self._auto_listen_var = tk.BooleanVar(value=False)
 
         self._build_ui()
         self.protocol("WM_DELETE_WINDOW", self._on_close)
@@ -407,6 +439,19 @@ class SmartIRCapture(tk.Tk):
                                     command=self._do_go_back, width=14, state="disabled")
         self._btn_back.pack(side=tk.RIGHT)
 
+        self._auto_listen_cb = ttk.Checkbutton(
+            btn_frame, text="🔁 Auto-listen for next code",
+            variable=self._auto_listen_var, command=self._on_auto_listen_toggled)
+        self._auto_listen_cb.pack(side=tk.RIGHT, padx=(0, 12))
+        _Tooltip(
+            self._auto_listen_cb,
+            "When enabled, listening for the next IR code starts automatically "
+            "right after you Confirm, Skip, or Copy-to-remaining — so you don't "
+            "need to click Capture again between codes.\n\n"
+            "Retry always re-arms listening on its own regardless of this setting. "
+            "Previous and re-capturing from Overview stay manual either way."
+        )
+
         # MQTT log
         log_frame = ttk.LabelFrame(tab, text="MQTT Log", padding=4)
         log_frame.grid(row=4, column=0, sticky="ew")
@@ -541,6 +586,7 @@ class SmartIRCapture(tk.Tk):
             self._sv["swing_modes"].set(", ".join(cfg.get("swingModes", [])))
             self._sv["single_code_modes"].set(", ".join(cfg.get("singleCodeModes", [])))
             self._sv["excluded_modes"].set(", ".join(cfg.get("excludedModes", [])))
+            self._auto_listen_var.set(bool(data.get("auto_listen", False)))
             self.session = data
             n = len(data.get("codes", {}))
             self._setup_status_var.set(f"✓ Session loaded — {n} code(s) captured so far.")
@@ -548,6 +594,7 @@ class SmartIRCapture(tk.Tk):
             messagebox.showerror("Load error", str(exc))
 
     def _save_session(self):
+        self.session["auto_listen"] = self._auto_listen_var.get()
         tmp = SESSION_FILE.with_suffix(".tmp")
         try:
             with open(tmp, "w") as f:
@@ -555,6 +602,10 @@ class SmartIRCapture(tk.Tk):
             os.replace(tmp, SESSION_FILE)
         except Exception as exc:
             self._log(f"[WARN] Session save failed: {exc}")
+
+    def _on_auto_listen_toggled(self):
+        """Persist the auto-listen preference as soon as it's toggled."""
+        self._save_session()
 
     def _parse_config(self) -> dict | None:
         try:
@@ -611,7 +662,11 @@ class SmartIRCapture(tk.Tk):
             return
 
         existing_codes = self.session.get("codes", {})
-        self.session = {"config": config, "codes": existing_codes}
+        self.session = {
+            "config": config,
+            "codes": existing_codes,
+            "auto_listen": self._auto_listen_var.get(),
+        }
         self._friendly_name = config["device_name"]
         self.combos = build_combos(config)
         self.current_idx = 0
@@ -705,6 +760,8 @@ class SmartIRCapture(tk.Tk):
             self.current_idx += 1
         self._update_capture_ui()
         self._update_progress()
+        if self._auto_listen_var.get() and self._current_combo() is not None:
+            self._do_capture()
 
     # Descriptions shown under each field value in the target breakdown
     _OP_MODE_DESC = {
