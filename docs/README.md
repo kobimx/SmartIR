@@ -44,12 +44,6 @@ infrarize:
   check_updates: false
 ```
 
-If you would like to get updates from the rc branch (Release Candidate), configure Infrarize as follows:
-```yaml
-infrarize:
-  update_branch: rc
-```
-
 **(3)** Configure a platform.
 
 ### *HACS*
