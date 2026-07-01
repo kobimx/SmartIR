@@ -1,4 +1,4 @@
-[![](https://img.shields.io/github/v/release/smartHomeHub/SmartIR.svg?style=flat-square)](https://github.com/smartHomeHub/SmartIR/releases/latest) [![](https://img.shields.io/badge/HACS-Custom-orange.svg?style=flat-square)](https://github.com/custom-components/hacs)
+[![](https://img.shields.io/github/v/release/kobimx/SmartIR.svg?style=flat-square)](https://github.com/kobimx/SmartIR/releases/latest) [![](https://img.shields.io/badge/HACS-Custom-orange.svg?style=flat-square)](https://github.com/custom-components/hacs)
 
 > ### ⚠️ Warning  
 > You are free to fork, modify, and use the code in this repository in accordance with the applicable open-source license.  

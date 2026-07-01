@@ -1,9 +1,9 @@
 {
   "domain": "smartir",
   "name": "SmartIR",
-  "documentation": "https://github.com/smartHomeHub/SmartIR",
+  "documentation": "https://github.com/kobimx/SmartIR",
   "dependencies": [],
-  "codeowners": ["@smartHomeHub"],
+  "codeowners": ["@kobimx"],
   "requirements": ["aiofiles>=0.6.0"],
   "homeassistant": "2025.5.0",
   "version": "1.18.1",

@@ -63,7 +63,7 @@ async def _load_device_json(platform: str, device_code: int) -> dict | None:
     if not os.path.exists(path):
         source = (
             "https://raw.githubusercontent.com/"
-            f"smartHomeHub/SmartIR/master/codes/{subdir}/{device_code}.json"
+            f"kobimx/SmartIR/master/codes/{subdir}/{device_code}.json"
         )
         try:
             await Helper.downloader(source, path)
