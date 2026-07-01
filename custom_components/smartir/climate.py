@@ -52,6 +52,15 @@ PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend({
     vol.Optional(CONF_POWER_SENSOR_RESTORE_STATE, default=False): cv.boolean
 })
 
+
+async def async_setup_entry(hass, entry, async_add_entities):
+    """Set up SmartIR Climate from a config entry."""
+    config = {**entry.data, **entry.options}
+    config.pop('platform', None)
+    config.setdefault('unique_id', entry.unique_id)
+    await async_setup_platform(hass, config, async_add_entities)
+
+
 async def async_setup_platform(hass, config, async_add_entities, discovery_info=None):
     """Set up the IR Climate platform."""
     _LOGGER.debug("Setting up the smartir platform")

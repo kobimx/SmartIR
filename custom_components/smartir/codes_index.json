@@ -2856,6 +2856,15 @@
       "encoding": "Base64"
     },
     {
+      "code": 2680,
+      "manufacturer": "Apton",
+      "models": [
+        "AFC-100T"
+      ],
+      "controller": "Broadlink",
+      "encoding": "Base64"
+    },
+    {
       "code": 2700,
       "manufacturer": "Kolin",
       "models": [
@@ -3994,6 +4003,15 @@
       "encoding": "Base64"
     },
     {
+      "code": 1440,
+      "manufacturer": "Andersson",
+      "models": [
+        "L4223FDC PVR"
+      ],
+      "controller": "Broadlink",
+      "encoding": "Base64"
+    },
+    {
       "code": 1460,
       "manufacturer": "Edifier",
       "models": [
@@ -4174,6 +4192,15 @@
       "manufacturer": "Iris Ohyama",
       "models": [
         "LEDHCL-R2"
+      ],
+      "controller": "Broadlink",
+      "encoding": "Base64"
+    },
+    {
+      "code": 1020,
+      "manufacturer": "NEC",
+      "models": [
+        "RE0201-CH1"
       ],
       "controller": "Broadlink",
       "encoding": "Base64"

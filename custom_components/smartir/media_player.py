@@ -42,6 +42,15 @@ PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend({
     vol.Optional(CONF_DEVICE_CLASS, default=DEFAULT_DEVICE_CLASS): cv.string
 })
 
+
+async def async_setup_entry(hass, entry, async_add_entities):
+    """Set up SmartIR Media Player from a config entry."""
+    config = {**entry.data, **entry.options}
+    config.pop('platform', None)
+    config.setdefault('unique_id', entry.unique_id)
+    await async_setup_platform(hass, config, async_add_entities)
+
+
 async def async_setup_platform(hass, config, async_add_entities, discovery_info=None):
     """Set up the IR Media Player platform."""
     device_code = config.get(CONF_DEVICE_CODE)

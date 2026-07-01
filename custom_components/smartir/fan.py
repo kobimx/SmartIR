@@ -44,6 +44,15 @@ PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend({
     vol.Optional(CONF_POWER_SENSOR): cv.entity_id
 })
 
+
+async def async_setup_entry(hass, entry, async_add_entities):
+    """Set up SmartIR Fan from a config entry."""
+    config = {**entry.data, **entry.options}
+    config.pop('platform', None)
+    config.setdefault('unique_id', entry.unique_id)
+    await async_setup_platform(hass, config, async_add_entities)
+
+
 async def async_setup_platform(hass, config, async_add_entities, discovery_info=None):
     """Set up the IR Fan platform."""
     device_code = config.get(CONF_DEVICE_CODE)

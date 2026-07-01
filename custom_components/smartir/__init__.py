@@ -66,6 +66,31 @@ async def async_setup(hass, config):
 
     return True
 
+
+async def async_setup_entry(hass, entry):
+    """Set up SmartIR from a config entry (UI-configured device)."""
+    platform = entry.data.get('platform')
+    if not platform:
+        return False
+    await hass.config_entries.async_forward_entry_setups(entry, [platform])
+    # Reload the entry whenever options are changed in the UI so the new
+    # controller_data / delay / sensor settings take effect immediately.
+    entry.async_on_unload(entry.add_update_listener(_async_options_updated))
+    return True
+
+
+async def _async_options_updated(hass, entry):
+    """Triggered when the options flow saves; reloads the config entry."""
+    await hass.config_entries.async_reload(entry.entry_id)
+
+
+async def async_unload_entry(hass, entry):
+    """Unload a SmartIR config entry."""
+    platform = entry.data.get('platform')
+    if not platform:
+        return True
+    return await hass.config_entries.async_unload_platforms(entry, [platform])
+
 async def _update(hass, branch, do_update=False, notify_if_latest=True):
     try:
         async with aiohttp.ClientSession() as session:

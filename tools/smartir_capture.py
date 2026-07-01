@@ -50,17 +50,25 @@ def gen_temps(min_t: float, max_t: float, precision: float) -> list:
 
 def build_combos(config: dict) -> list:
     """Return ordered list of combo dicts: first 'off', then all mode/fan/[swing]/temp."""
+    single_code = set(config.get("singleCodeModes", []))
+    excluded    = set(config.get("excludedModes", []))
     combos = [{"type": "off"}]
     for mode in config["operationModes"]:
+        if mode in excluded:
+            continue
+        is_single = mode in single_code
         for fan in config["fanModes"]:
             temps = gen_temps(config["minTemperature"], config["maxTemperature"], config["precision"])
+            capture_temps = [temps[0]] if is_single else temps
             if config.get("swingModes"):
                 for swing in config["swingModes"]:
-                    for temp in temps:
-                        combos.append({"type": "code", "mode": mode, "fan": fan, "swing": swing, "temp": temp})
+                    for temp in capture_temps:
+                        combos.append({"type": "code", "mode": mode, "fan": fan,
+                                       "swing": swing, "temp": temp, "single_code": is_single})
             else:
-                for temp in temps:
-                    combos.append({"type": "code", "mode": mode, "fan": fan, "temp": temp})
+                for temp in capture_temps:
+                    combos.append({"type": "code", "mode": mode, "fan": fan,
+                                   "temp": temp, "single_code": is_single})
     return combos
 
 
@@ -82,7 +90,10 @@ def combo_label(combo: dict) -> str:
     parts = [combo["mode"].upper(), combo["fan"]]
     if "swing" in combo:
         parts.append(combo["swing"])
-    parts.append(f"{combo['temp']}°C")
+    if combo.get("single_code"):
+        parts.append("all temps")
+    else:
+        parts.append(f"{combo['temp']}°C")
     return " / ".join(parts)
 
 
@@ -236,6 +247,24 @@ class SmartIRCapture(tk.Tk):
                 "  Top / High / Mid / Low / Bottom  — Named positions\n\n"
                 "Tip: name them to match what the HA climate card should display."
             ),
+            "single_code_modes": (
+                "Single-code Modes",
+                "Modes where temperature does NOT affect the IR signal.\n"
+                "One code is captured per fan/swing combination and applied to ALL temperatures.\n\n"
+                "Typical values:\n"
+                "  dry        — Dehumidify (AC ignores the setpoint temperature)\n"
+                "  fan_only   — Fan only (no heating/cooling, temperature is irrelevant)\n\n"
+                "Leave empty to capture the full temperature range for every mode."
+            ),
+            "excluded_modes": (
+                "Excluded Modes",
+                "Modes to skip entirely — no codes will be captured or exported.\n\n"
+                "Useful when your unit does not support a mode at all:\n"
+                "  auto       — Automatic / AI mode (not on all units)\n"
+                "  heat_cool  — Dual-setpoint mode (rare)\n\n"
+                "Excluded modes are removed from the exported JSON operationModes list\n"
+                "so Home Assistant will not show them in the climate card."
+            ),
         }
 
         def _show_help(key):
@@ -266,9 +295,11 @@ class SmartIRCapture(tk.Tk):
                              command=lambda k=key: _show_help(k))
             btn.grid(row=row, column=2, padx=(4, 0))
 
-        modes_row(modes_frame, 0, "Operation modes:", "op_modes",    "cool, heat, dry, fan_only")
-        modes_row(modes_frame, 1, "Fan modes:",       "fan_modes",   "auto, low, mid, high")
-        modes_row(modes_frame, 2, "Swing modes:",     "swing_modes", "")
+        modes_row(modes_frame, 0, "Operation modes:",   "op_modes",          "cool, heat, dry, fan_only")
+        modes_row(modes_frame, 1, "Fan modes:",         "fan_modes",         "auto, low, mid, high")
+        modes_row(modes_frame, 2, "Swing modes:",       "swing_modes",       "")
+        modes_row(modes_frame, 3, "Single-code modes:", "single_code_modes", "dry, fan_only")
+        modes_row(modes_frame, 4, "Excluded modes:",    "excluded_modes",    "")
 
         # ── Actions ──
         btn_frame = ttk.Frame(tab)
@@ -508,6 +539,8 @@ class SmartIRCapture(tk.Tk):
             self._sv["op_modes"].set(", ".join(cfg.get("operationModes", [])))
             self._sv["fan_modes"].set(", ".join(cfg.get("fanModes", [])))
             self._sv["swing_modes"].set(", ".join(cfg.get("swingModes", [])))
+            self._sv["single_code_modes"].set(", ".join(cfg.get("singleCodeModes", [])))
+            self._sv["excluded_modes"].set(", ".join(cfg.get("excludedModes", [])))
             self.session = data
             n = len(data.get("codes", {}))
             self._setup_status_var.set(f"✓ Session loaded — {n} code(s) captured so far.")
@@ -539,6 +572,10 @@ class SmartIRCapture(tk.Tk):
             fan_modes = [m.strip() for m in self._sv["fan_modes"].get().split(",") if m.strip()]
             sw_raw    = self._sv["swing_modes"].get().strip()
             swing_modes = [m.strip() for m in sw_raw.split(",") if m.strip()] if sw_raw else []
+            sc_raw    = self._sv["single_code_modes"].get().strip()
+            single_code_modes = [m.strip() for m in sc_raw.split(",") if m.strip()] if sc_raw else []
+            ex_raw    = self._sv["excluded_modes"].get().strip()
+            excluded_modes = [m.strip() for m in ex_raw.split(",") if m.strip()] if ex_raw else []
 
             if not all([host, device, mfr, models, op_modes, fan_modes]):
                 raise ValueError("All required fields must be filled.")
@@ -554,6 +591,8 @@ class SmartIRCapture(tk.Tk):
                 "manufacturer": mfr, "supportedModels": models,
                 "minTemperature": min_t, "maxTemperature": max_t, "precision": prec,
                 "operationModes": op_modes, "fanModes": fan_modes, "swingModes": swing_modes,
+                "singleCodeModes": single_code_modes,
+                "excludedModes": excluded_modes,
             }
         except ValueError as exc:
             messagebox.showerror("Config error", str(exc))
@@ -729,7 +768,10 @@ class SmartIRCapture(tk.Tk):
             ]
             if "swing" in combo:
                 fields.append(("Swing Position", combo["swing"], "Vane direction"))
-            fields.append(("Temperature", f"{temp} °C", "Target temperature"))
+            if combo.get("single_code"):
+                fields.append(("Temperature", "all temps", "One code → fills all temperatures"))
+            else:
+                fields.append(("Temperature", f"{temp} °C", "Target temperature"))
 
         for i, cell in enumerate(self._breakdown_cells):
             hv, vv = cell
@@ -783,9 +825,11 @@ class SmartIRCapture(tk.Tk):
         self._status_var.set("✓  Code received!  Confirm or Retry.")
         self._status_label.configure(foreground="green")
         self._set_code_preview(code)
+        combo = self._current_combo()
+        can_copy = combo is not None and combo["type"] != "off" and not combo.get("single_code")
         self._btn_confirm.configure(state="normal")
         self._btn_retry.configure(state="normal")
-        self._btn_copy.configure(state="normal")
+        self._btn_copy.configure(state="normal" if can_copy else "disabled")
         self._btn_capture.configure(state="disabled")
         self._log(f"[OK]   Code received ({len(code)} chars)")
 
@@ -1010,6 +1054,9 @@ class SmartIRCapture(tk.Tk):
         commands: dict = {}
         missing: list  = []
 
+        all_temps = gen_temps(
+            config["minTemperature"], config["maxTemperature"], config["precision"])
+
         for combo in self.combos:
             key  = combo_key(combo)
             code = captured.get(key)
@@ -1030,11 +1077,16 @@ class SmartIRCapture(tk.Tk):
                 missing.append(key)
                 code = ""
 
+            # Single-code mode: one capture expands to fill every temperature slot
+            temps_to_write = all_temps if combo.get("single_code") else [temp]
+
             if "swing" in combo:
                 swing = combo["swing"]
-                commands.setdefault(mode, {}).setdefault(fan, {}).setdefault(swing, {})[temp] = code
+                for t in temps_to_write:
+                    commands.setdefault(mode, {}).setdefault(fan, {}).setdefault(swing, {})[t] = code
             else:
-                commands.setdefault(mode, {}).setdefault(fan, {})[temp] = code
+                for t in temps_to_write:
+                    commands.setdefault(mode, {}).setdefault(fan, {})[t] = code
 
         if missing:
             answer = messagebox.askyesno(
@@ -1053,7 +1105,8 @@ class SmartIRCapture(tk.Tk):
             "minTemperature":    config["minTemperature"],
             "maxTemperature":    config["maxTemperature"],
             "precision":         config["precision"],
-            "operationModes":    config["operationModes"],
+            "operationModes":    [m for m in config["operationModes"]
+                                   if m not in set(config.get("excludedModes", []))],
             "fanModes":          config["fanModes"],
         }
         if config.get("swingModes"):
